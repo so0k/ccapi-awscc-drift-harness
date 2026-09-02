@@ -41,5 +41,33 @@ cd ccapi && terraform init && terraform plan
 aws ecs update-cluster-settings --cluster <name> --settings name=containerInsights,value=disabled
 ```
 
-State is local and gitignored. Part of the cdktn bridge planning work (CDK → Terraform via
-awscc + cfncompat).
+State is local and gitignored.
+
+### Step-by-step scenario logs
+
+The exact commands run and the output observed at each step, from the 2026-09-02 verification
+run, live in [`observations/`](observations/) — one file per scenario:
+
+| scenario | what it shows |
+|---|---|
+| [01 baseline apply](observations/01-baseline-apply.md) | init, first plan, apply — both models |
+| [02 unrelated edit vs references](observations/02-unrelated-edit-references.md) | a tag edit re-unknowns every ccapi-derived output |
+| [03 out-of-band drift](observations/03-out-of-band-drift.md) | the core scenario: `-refresh-only` vs plain plan, and what actually lands in state |
+| [04 ignore_changes](observations/04-ignore-changes.md) | nested-path granularity vs the all-or-nothing envelope |
+| [05 replacement](observations/05-replacement.md) | where `# forces replacement` attaches |
+| [06 cleanup](observations/06-cleanup.md) | destroy + INACTIVE verification |
+
+## Conclusion
+
+If infrastructure work is heading toward agent-driven loops — plan, read the diff, decide,
+retry — the typed model's value compounds. A tight feedback loop needs to know *which argument*
+forced replacement, see drift as a named attribute change, scope `ignore_changes` to one
+property, and fail as early as possible: at compile time in generated bindings, at
+validate/plan time in the provider schema — not at apply time inside an opaque string. Every
+one of those signals exists in the `awscc` model and collapses into a single `desired_state`
+diff in the envelope. Shifting validation left is precisely what makes automated loops safe
+and cheap to iterate — a strong argument for `awscc` (typed, generated schemas) as the primary
+target, with the envelope reserved for escape hatches.
+
+---
+Part of the cdktn bridge planning work (CDK → Terraform via awscc + cfncompat).
